@@ -45,19 +45,24 @@ const COND=[['MT','Mint'],['NM','Near Mint'],['EX','Excellent'],['GD','Good'],['
 const LANG=['IT','EN','JA','DE','FR','ES','PT','KO','ZH'];
 const VL={normal:'Normale',holofoil:'Holo',reverseHolofoil:'Reverse Holo','1stEditionHolofoil':'1ª ed. Holo','1stEditionNormal':'1ª ed.',unlimitedHolofoil:'Unlimited Holo',unlimited:'Unlimited'};
 const opt=(a,v)=>a.map(x=>{const[k,t]=Array.isArray(x)?x:[x,x];return`<option value="${E(k)}"${k==v?' selected':''}>${E(t)}</option>`}).join('');
-let tab='home',sub=null,R=[],SETS=null,msg='';
+let tab='home',sub=null,R=[],SETS=null,msg='',LQ='';
+const cget=k=>{try{const v=JSON.parse(L.ptkc||'{}')[k];return v&&Date.now()-v.t<864e5?v.d:null}catch(e){return null}};
+const cput=(k,d)=>{try{const o=JSON.parse(L.ptkc||'{}'),ks=Object.keys(o);if(ks.length>12)delete o[ks[0]];o[k]={t:Date.now(),d};L.ptkc=JSON.stringify(o)}catch(e){}};
+const sortR=(a,o)=>a.sort((x,y)=>o=='new'?(y.d||'').localeCompare(x.d||''):o=='old'?(x.d||'').localeCompare(y.d||''):o=='n'?x.n.localeCompare(y.n):o=='p'?y.p-x.p:o=='pl'?x.p-y.p:(parseInt(x.num)||0)-(parseInt(y.num)||0));
+const bar=()=>`<div class="row">${back}<select data-ch="sort" style="width:auto">${opt([['new','Più recenti'],['old','Meno recenti'],['n','Nome'],['p','Prezzo ↓'],['pl','Prezzo ↑'],['num','Numero']],sub.o)}</select></div>`;
+const rt=()=>sub.err?'<br><button class="pri" data-a="retry">Riprova</button><br>':'';
 document.documentElement.dataset.t=S.theme;
-async function api(p){const r=await fetch('https://api.pokemontcg.io/v2/'+p,{headers:S.key?{'X-Api-Key':S.key}:{}});if(!r.ok)throw new Error('Errore '+r.status);return(await r.json()).data}
+async function api(p){let er;for(let t=0;t<3;t++){try{const c=new AbortController(),to=setTimeout(()=>c.abort(),15000);const r=await fetch('https://api.pokemontcg.io/v2/'+p,{headers:S.key?{'X-Api-Key':S.key}:{},signal:c.signal});clearTimeout(to);if(!r.ok)throw new Error('Errore '+r.status);return(await r.json()).data}catch(e){er=e;await new Promise(r=>setTimeout(r,700*(t+1)))}}throw er}
 const pr=c=>{const m=c.cardmarket&&c.cardmarket.prices;return m?(m.trendPrice??m.averageSellPrice??m.avg30??0):0};
 const cmx=c=>{const m=c.cardmarket&&c.cardmarket.prices;return m?{a1:m.avg1,a7:m.avg7,a30:m.avg30,t:m.trendPrice}:null};
-const mk=c=>({id:c.id,n:c.name,s:c.set.name,sid:c.set.id,ser:c.set.series,num:c.number+'/'+c.set.printedTotal,img:c.images.small,p:pr(c),cm:cmx(c),vs:Object.keys((c.tcgplayer&&c.tcgplayer.prices)||{})});
+const mk=c=>({id:c.id,n:c.name,s:c.set.name,sid:c.set.id,ser:c.set.series,d:c.set.releaseDate,num:c.number+'/'+c.set.printedTotal,img:c.images.small,p:pr(c),cm:cmx(c),vs:Object.keys((c.tcgplayer&&c.tcgplayer.prices)||{})});
 const SEL='select=id,name,number,set,images,tcgplayer,cardmarket';
 const colItems=()=>S.items.filter(i=>i.col==S.cur);
 const val=a=>a.reduce((t,i)=>t+i.q*i.p,0);
 const owned=id=>colItems().some(i=>i.id==id);
-async function doSearch(t){t=t.replace(/["*]/g,'').trim();if(!t)return;sub={t:'res'};msg='Cerco…';render();
+async function doSearch(t){t=t.replace(/["*]/g,'').trim();if(!t)return;LQ=t;sub={t:'res',o:'new'};msg='Cerco…';R=[];render();
  const m=t.match(/^(.*?)\s+(\d+)$/);const q=m?`name:"${m[1]}*" number:${m[2]}`:`name:"${t}*"`;
- try{R=(await api('cards?pageSize=36&orderBy=-set.releaseDate&'+SEL+'&q='+encodeURIComponent(q))).map(mk);msg=R.length?'':'Nessuna carta trovata'}catch(e){R=[];msg='Ricerca non riuscita ('+e.message+'). Controlla la connessione o inserisci una chiave API nelle impostazioni.'}render()}
+ const k='s:'+q,c=cget(k);if(c){R=c;msg=''}else try{R=(await api('cards?pageSize=100&'+SEL+'&q='+encodeURIComponent(q))).map(mk);if(R.length)cput(k,R);msg=R.length?'':'Nessuna carta trovata'}catch(e){R=[];msg='Ricerca non riuscita ('+e.message+').';sub.err=1}sortR(R,sub.o);render()}
 $('#q').addEventListener('keydown',e=>{if(e.key=='Enter'){e.target.blur();doSearch(e.target.value)}});
 function grid(list,fn){return`<div class="grid">${list.map((c,i)=>`<div data-a="${fn}" data-i="${i}" class="${owned(c.id)?'own':''}"><img loading="lazy" src="${E(c.img)}" alt=""><b>${E(c.n)}</b><div class="mu">${E(c.num)} · ${eur(c.p)}</div>${owned(c.id)?'<span class="bd">✓</span>':''}</div>`).join('')}</div>`}
 function chart(){const h=S.hist.map(x=>x[1][S.cur]).filter(v=>v!=null).slice(-30);if(h.length<2)return'<p class="mu">Il grafico si riempie giorno dopo giorno, aprendo l’app.</p>';
@@ -75,8 +80,8 @@ const col=()=>{const a=colItems(),g={};a.forEach(i=>(g[i.sid]=g[i.sid]||{n:i.s,l
  return`<h1>Collezioni</h1>${colSel()}<div class="card"><div class="mu">Valore</div><div class="big">${eur(val(a))}</div>${chart()}</div><h2>Per espansione</h2>`+(a.length?Object.keys(g).map(k=>`<div class="card row" data-a="cs" data-id="${E(k)}"><div><b>${E(g[k].n)}</b><div class="mu">${g[k].l.reduce((t,i)=>t+i.q,0)} carte</div></div><b>${eur(val(g[k].l))}</b></div>`).join(''):'<p class="mu">Ancora nessuna carta. Cercane una e aggiungila.</p>')};
 const menu=()=>`<h1>Menu</h1><div class="card"><button class="pri" data-a="settings">Impostazioni</button></div><div class="card"><button class="pri" data-a="wl">Wishlist (${S.wish.length})</button></div><div class="card"><button class="pri" data-a="imp">Importa CSV</button></div><div class="card"><button class="pri" data-a="exp">Esporta CSV</button></div>`;
 function subView(){
- if(sub.t=='res')return back+`<h2>Risultati</h2>`+(msg?`<p class="mu">${E(msg)}</p>`:'')+grid(R,'add');
- if(sub.t=='set'){return back+`<h2>${E(sub.n)}</h2>`+(msg?`<p class="mu">${E(msg)}</p>`:'')+grid(R,'add')}
+ if(sub.t=='res')return bar()+`<h2>Risultati</h2>`+(msg?`<p class="mu">${E(msg)}</p>`:'')+rt()+grid(R,'add');
+ if(sub.t=='set'){return bar()+`<h2>${E(sub.n)}</h2>`+(msg?`<p class="mu">${E(msg)}</p>`:'')+rt()+grid(R,'add')}
  if(sub.t=='wl'){return back+'<h2>Wishlist</h2>'+(S.wish.length?`<div class="grid">${S.wish.map((c,i)=>`<div data-a="wadd" data-i="${i}"><img src="${E(c.img)}" alt=""><b>${E(c.n)}</b><div class="mu">${eur(c.p)}</div></div>`).join('')}</div><p class="mu">Tocca una carta per aggiungerla alla collezione.</p>`:'<p class="mu">Nessuna carta in wishlist. Aggiungila dalla scheda di una carta.</p>')}
  if(sub.t=='cs'){const a=colItems().filter(i=>i.sid==sub.id).sort((x,y)=>sub.o=='n'?x.n.localeCompare(y.n):y.p-x.p);
   return back+`<h2>${E(a[0]?a[0].s:'')}</h2><div class="row"><span class="mu">${eur(val(a))}</span><select data-ch="ord"><option value="p">Prezzo</option><option value="n"${sub.o=='n'?' selected':''}>Nome</option></select></div><br>`+`<div class="grid">${a.map(i=>`<div data-a="edit" data-i="${S.items.indexOf(i)}"><img src="${E(i.img)}" alt=""><b>${E(i.n)}</b><div class="mu">${i.cd} · ${i.lg} · ${eur(i.p)}</div><span class="bd">${i.q}</span></div>`).join('')}</div>`}}
@@ -95,7 +100,8 @@ function form(c,it){const vs=c.vs&&c.vs.length?c.vs:['normal'];
 const rd=()=>({col:$('#f-col').value,lg:$('#f-lg').value,cd:$('#f-cd').value,vr:$('#f-vr').value,q:Math.max(1,parseInt($('#f-q').value)||1),b:$('#f-b').value===''?null:parseFloat($('#f-b').value)});
 let cur=null;
 const A={
- tab(d){tab=d.id;sub=null;msg='';render()},back(){sub=null;msg='';render()},close,
+ tab(d){tab=d.id;sub=null;msg='';$('#q').value='';render()},back(){sub=null;msg='';$('#q').value='';render()},close,
+ retry(){sub&&sub.t=='set'?A.set({id:sub.id}):doSearch(LQ)},
  add(d){cur=R[d.i];sheet(form(cur)+`<button class="pri" data-a="doadd">Aggiungi alla collezione</button><br><br><button data-a="dowish" style="width:100%">♥ Aggiungi alla wishlist</button><br><br><button data-a="close" style="width:100%">Annulla</button>`)},
  doadd(){const f=rd(),c=cur;const k=S.items.find(i=>i.id==c.id&&i.col==f.col&&i.lg==f.lg&&i.cd==f.cd&&i.vr==f.vr);
   if(k){k.q+=f.q;if(f.b!=null)k.b=f.b}else S.items.push({id:c.id,n:c.n,s:c.s,sid:c.sid,ser:c.ser,num:c.num,img:c.img,p:c.p,cm:c.cm,...f});
@@ -106,8 +112,8 @@ const A={
   sheet(form(i,i)+`<button class="pri" data-a="doedit">Salva modifiche</button><br><br><button data-a="dodel" style="width:100%;color:var(--ko)">Elimina carta</button><h2>Andamento prezzo (Cardmarket)</h2>`+(m?`<div class="card">Media 1 giorno: ${eur(m.a1)}<br>Media 7 giorni: ${eur(m.a7)}<br>Media 30 giorni: ${eur(m.a30)}<br>Prezzo di tendenza: ${eur(m.t)}</div>`:'<p class="mu">Prezzi non disponibili per questa carta.</p>'))},
  doedit(){Object.assign(S.items[cur.idx],rd());save();close();render()},
  dodel(){if(confirm('Eliminare questa carta dalla collezione?')){S.items.splice(cur.idx,1);save();close();render()}},
- async set(d){sub={t:'set',n:(SETS.find(s=>s.id==d.id)||{}).name};msg='Carico le carte…';R=[];render();
-  try{R=(await api(`cards?pageSize=250&orderBy=number&${SEL}&q=`+encodeURIComponent('set.id:'+d.id))).map(mk);msg=''}catch(e){msg='Caricamento non riuscito ('+e.message+')'}render()},
+ async set(d){sub={t:'set',id:d.id,o:'num',n:(SETS.find(s=>s.id==d.id)||{}).name};msg='Carico le carte…';R=[];render();
+  try{R=(await api(`cards?pageSize=250&${SEL}&q=`+encodeURIComponent('set.id:'+d.id))).map(mk);sortR(R,'num');msg=''}catch(e){msg='Caricamento non riuscito ('+e.message+')';sub.err=1}render()},
  cs(d){sub={t:'cs',id:d.id,o:'p'};render()},wl(){sub={t:'wl'};render()},
  newcol(){const n=prompt('Nome della nuova collezione');if(n&&n.trim()){const id='c'+Date.now();S.cols.push({id,n:n.trim()});S.cur=id;save();render()}},
  settings(){sheet(`<h2>Impostazioni</h2><label>Il tuo nome</label><input id="s-n" value="${E(S.name)}"><label>Tema</label><select id="s-t">${opt([['dark','Scuro'],['light','Chiaro']],S.theme)}</select><label>Chiave API Pokémon TCG (facoltativa, rende la ricerca più veloce)</label><input id="s-k" value="${E(S.key)}"><br><button class="pri" data-a="sets">Salva</button>`)},
@@ -119,7 +125,7 @@ const A={
  imp(){$('#fi').click()}
 };
 document.addEventListener('click',e=>{const a=e.target.closest('[data-a]');if(a&&A[a.dataset.a])A[a.dataset.a](a.dataset)});
-document.addEventListener('change',e=>{const c=e.target.dataset.ch;if(c=='cur'){S.cur=e.target.value;save();render()}if(c=='ord'){sub.o=e.target.value;render()}});
+document.addEventListener('change',e=>{const c=e.target.dataset.ch;if(c=='cur'){S.cur=e.target.value;save();render()}if(c=='ord'){sub.o=e.target.value;render()}if(c=='sort'){sub.o=e.target.value;sortR(R,sub.o);render()}});
 function csv(t){const r=[];let row=[],f='',q=false;t=t.replace(/^\ufeff/,'');for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==','){row.push(f);f=''}else if(c=='\n'||c=='\r'){if(c=='\r'&&t[i+1]=='\n')i++;row.push(f);f='';r.push(row);row=[]}else f+=c}if(f||row.length){row.push(f);r.push(row)}return r.filter(x=>x.length>1)}
 $('#fi').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;const r=csv(await f.text());r.shift();let n=0;
  r.forEach(x=>{if(x.length<13)return;let c=S.cols.find(k=>k.n==x[0]);if(!c){c={id:'c'+Date.now()+n,n:x[0]||'Importata'};S.cols.push(c)}
