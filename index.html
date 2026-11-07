@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Collezione">
+<title>Collezione Pokémon</title>
+<style>
+:root{--bg:#070a14;--c1:#0f1422;--c2:#182036;--tx:#f2f4fb;--mu:#8b93ad;--ac:#9b5cf6;--ok:#34d399;--ko:#f87171}
+:root[data-t=light]{--bg:#f3f4f9;--c1:#fff;--c2:#e9ecf5;--tx:#12172a;--mu:#656d88}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,system-ui,sans-serif;padding:calc(env(safe-area-inset-top) + 68px) 14px calc(env(safe-area-inset-bottom) + 90px)}
+header{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top) + 8px) 14px 8px;background:var(--bg);z-index:5}
+input,select,button{font:inherit;color:var(--tx)}
+input,select{width:100%;background:var(--c2);border:0;border-radius:12px;padding:11px 14px;outline:0}
+button{border:0;background:var(--c2);border-radius:12px;padding:11px 14px;cursor:pointer}
+.pri{background:var(--ac);color:#fff;font-weight:600;width:100%}
+h1{font-size:26px;margin:6px 0 12px}h2{font-size:18px;margin:14px 0 8px}
+.card{background:var(--c1);border-radius:18px;padding:14px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.mu{color:var(--mu);font-size:14px}.big{font-size:34px;font-weight:700}
+.up{color:var(--ok)}.dn{color:var(--ko)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid>div{background:var(--c1);border-radius:12px;padding:6px;font-size:13px;position:relative}
+.grid img{width:100%;border-radius:6px;display:block}
+.grid .own{outline:2px solid var(--ac)}
+.bd{position:absolute;top:8px;right:8px;background:var(--ac);color:#fff;border-radius:10px;padding:0 7px;font-size:12px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--c1);padding:8px 6px calc(env(safe-area-inset-bottom) + 8px);z-index:5}
+nav button{flex:1;background:none;font-size:12px;color:var(--mu);padding:8px 2px}
+nav button.on{color:var(--ac);font-weight:700}
+#sh{position:fixed;inset:0;background:#000a;z-index:9;display:none;align-items:flex-end}
+#sh>div{background:var(--bg);width:100%;max-height:88vh;overflow:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom) + 20px)}
+label{display:block;margin:10px 0 4px}details summary{padding:10px 0;font-weight:600}
+</style></head><body>
+<header><input id="q" placeholder="Cerca una carta (es. Mantine o Mantine 77)" enterkeyhint="search"></header>
+<main id="m"></main>
+<nav id="nv"></nav><div id="sh"></div><input type="file" id="fi" accept=".csv" hidden>
+<script>
+const L=localStorage;let S={};try{S=JSON.parse(L.ptk1)||{}}catch(e){}
+Object.assign(S,{name:S.name||'',theme:S.theme||'dark',key:S.key||'',cols:S.cols||[{id:'c1',n:'La mia collezione'}],cur:S.cur||'c1',items:S.items||[],wish:S.wish||[],hist:S.hist||[]});
+const save=()=>{try{L.ptk1=JSON.stringify(S)}catch(e){}};
+const E=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const eur=n=>'€'+(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+const $=s=>document.querySelector(s);
+const COND=[['MT','Mint'],['NM','Near Mint'],['EX','Excellent'],['GD','Good'],['LP','Light Played'],['PL','Played'],['PO','Poor']];
+const LANG=['IT','EN','JA','DE','FR','ES','PT','KO','ZH'];
+const VL={normal:'Normale',holofoil:'Holo',reverseHolofoil:'Reverse Holo','1stEditionHolofoil':'1ª ed. Holo','1stEditionNormal':'1ª ed.',unlimitedHolofoil:'Unlimited Holo',unlimited:'Unlimited'};
+const opt=(a,v)=>a.map(x=>{const[k,t]=Array.isArray(x)?x:[x,x];return`<option value="${E(k)}"${k==v?' selected':''}>${E(t)}</option>`}).join('');
+let tab='home',sub=null,R=[],SETS=null,msg='';
+document.documentElement.dataset.t=S.theme;
+async function api(p){const r=await fetch('https://api.pokemontcg.io/v2/'+p,{headers:S.key?{'X-Api-Key':S.key}:{}});if(!r.ok)throw new Error('Errore '+r.status);return(await r.json()).data}
+const pr=c=>{const m=c.cardmarket&&c.cardmarket.prices;return m?(m.trendPrice??m.averageSellPrice??m.avg30??0):0};
+const cmx=c=>{const m=c.cardmarket&&c.cardmarket.prices;return m?{a1:m.avg1,a7:m.avg7,a30:m.avg30,t:m.trendPrice}:null};
+const mk=c=>({id:c.id,n:c.name,s:c.set.name,sid:c.set.id,ser:c.set.series,num:c.number+'/'+c.set.printedTotal,img:c.images.small,p:pr(c),cm:cmx(c),vs:Object.keys((c.tcgplayer&&c.tcgplayer.prices)||{})});
+const SEL='select=id,name,number,set,images,tcgplayer,cardmarket';
+const colItems=()=>S.items.filter(i=>i.col==S.cur);
+const val=a=>a.reduce((t,i)=>t+i.q*i.p,0);
+const owned=id=>colItems().some(i=>i.id==id);
+async function doSearch(t){t=t.replace(/["*]/g,'').trim();if(!t)return;sub={t:'res'};msg='Cerco…';render();
+ const m=t.match(/^(.*?)\s+(\d+)$/);const q=m?`name:"${m[1]}*" number:${m[2]}`:`name:"${t}*"`;
+ try{R=(await api('cards?pageSize=36&orderBy=-set.releaseDate&'+SEL+'&q='+encodeURIComponent(q))).map(mk);msg=R.length?'':'Nessuna carta trovata'}catch(e){R=[];msg='Ricerca non riuscita ('+e.message+'). Controlla la connessione o inserisci una chiave API nelle impostazioni.'}render()}
+$('#q').addEventListener('keydown',e=>{if(e.key=='Enter'){e.target.blur();doSearch(e.target.value)}});
+function grid(list,fn){return`<div class="grid">${list.map((c,i)=>`<div data-a="${fn}" data-i="${i}" class="${owned(c.id)?'own':''}"><img loading="lazy" src="${E(c.img)}" alt=""><b>${E(c.n)}</b><div class="mu">${E(c.num)} · ${eur(c.p)}</div>${owned(c.id)?'<span class="bd">✓</span>':''}</div>`).join('')}</div>`}
+function chart(){const h=S.hist.map(x=>x[1][S.cur]).filter(v=>v!=null).slice(-30);if(h.length<2)return'<p class="mu">Il grafico si riempie giorno dopo giorno, aprendo l’app.</p>';
+ const mx=Math.max(...h),mn=Math.min(...h),r=(mx-mn)||1;const p=h.map((v,i)=>`${i*(300/(h.length-1))},${60-((v-mn)/r)*54}`).join(' ');
+ return`<svg viewBox="0 0 300 64" width="100%" height="80"><polyline points="${p}" fill="none" stroke="var(--ac)" stroke-width="2.5"/></svg>`}
+function colSel(){return`<div class="row"><select data-ch="cur">${opt(S.cols.map(c=>[c.id,c.n]),S.cur)}</select><button data-a="newcol">+</button></div>`}
+const back='<button data-a="back">← Indietro</button>';
+const home=()=>{const v=val(colItems());return`<h1>Ciao${S.name?', '+E(S.name):''}!</h1><div class="card"><div class="mu">Valore collezione</div>${colSel()}<div class="big">${eur(v)}</div>${chart()}</div><div class="card mu">Hai ${colItems().reduce((t,i)=>t+i.q,0)} carte in questa collezione. Usa la barra in alto per cercarne e aggiungerne di nuove.</div>`};
+const scan=()=>'<h1>Scanner</h1><div class="card mu">La scansione con la fotocamera arriva nel prossimo passo. Per ora aggiungi le carte con la ricerca manuale.</div>';
+async function loadSets(){if(SETS)return;try{SETS=await api('sets?orderBy=-releaseDate&select=id,name,series,total,printedTotal,releaseDate')}catch(e){msg='Impossibile caricare le espansioni ('+e.message+')'}render()}
+const exp=()=>{if(!SETS){loadSets();return'<h1>Espansioni</h1><p class="mu">Carico le espansioni…</p>'}
+ const g={};SETS.forEach(s=>(g[s.series]=g[s.series]||[]).push(s));
+ return'<h1>Espansioni</h1><p class="mu">Globale</p>'+(msg?`<p class="dn">${E(msg)}</p>`:'')+Object.keys(g).map((k,n)=>`<details ${n?'':'open'}><summary>${E(k)} (${g[k].length})</summary>${g[k].map(s=>`<div class="card row" data-a="set" data-id="${E(s.id)}"><div><b>${E(s.name)}</b><div class="mu">${E(s.releaseDate.slice(0,4))}</div></div><div>${new Set(colItems().filter(i=>i.sid==s.id).map(i=>i.id)).size}/${s.printedTotal}</div></div>`).join('')}</details>`).join('')};
+const col=()=>{const a=colItems(),g={};a.forEach(i=>(g[i.sid]=g[i.sid]||{n:i.s,l:[]}).l.push(i));
+ return`<h1>Collezioni</h1>${colSel()}<div class="card"><div class="mu">Valore</div><div class="big">${eur(val(a))}</div>${chart()}</div><h2>Per espansione</h2>`+(a.length?Object.keys(g).map(k=>`<div class="card row" data-a="cs" data-id="${E(k)}"><div><b>${E(g[k].n)}</b><div class="mu">${g[k].l.reduce((t,i)=>t+i.q,0)} carte</div></div><b>${eur(val(g[k].l))}</b></div>`).join(''):'<p class="mu">Ancora nessuna carta. Cercane una e aggiungila.</p>')};
+const menu=()=>`<h1>Menu</h1><div class="card"><button class="pri" data-a="settings">Impostazioni</button></div><div class="card"><button class="pri" data-a="wl">Wishlist (${S.wish.length})</button></div><div class="card"><button class="pri" data-a="imp">Importa CSV</button></div><div class="card"><button class="pri" data-a="exp">Esporta CSV</button></div>`;
+function subView(){
+ if(sub.t=='res')return back+`<h2>Risultati</h2>`+(msg?`<p class="mu">${E(msg)}</p>`:'')+grid(R,'add');
+ if(sub.t=='set'){return back+`<h2>${E(sub.n)}</h2>`+(msg?`<p class="mu">${E(msg)}</p>`:'')+grid(R,'add')}
+ if(sub.t=='wl'){return back+'<h2>Wishlist</h2>'+(S.wish.length?`<div class="grid">${S.wish.map((c,i)=>`<div data-a="wadd" data-i="${i}"><img src="${E(c.img)}" alt=""><b>${E(c.n)}</b><div class="mu">${eur(c.p)}</div></div>`).join('')}</div><p class="mu">Tocca una carta per aggiungerla alla collezione.</p>`:'<p class="mu">Nessuna carta in wishlist. Aggiungila dalla scheda di una carta.</p>')}
+ if(sub.t=='cs'){const a=colItems().filter(i=>i.sid==sub.id).sort((x,y)=>sub.o=='n'?x.n.localeCompare(y.n):y.p-x.p);
+  return back+`<h2>${E(a[0]?a[0].s:'')}</h2><div class="row"><span class="mu">${eur(val(a))}</span><select data-ch="ord"><option value="p">Prezzo</option><option value="n"${sub.o=='n'?' selected':''}>Nome</option></select></div><br>`+`<div class="grid">${a.map(i=>`<div data-a="edit" data-i="${S.items.indexOf(i)}"><img src="${E(i.img)}" alt=""><b>${E(i.n)}</b><div class="mu">${i.cd} · ${i.lg} · ${eur(i.p)}</div><span class="bd">${i.q}</span></div>`).join('')}</div>`}}
+function render(){$('#m').innerHTML=sub?subView():({home,exp,scan,col,menu}[tab])();
+ $('#nv').innerHTML=[['home','Home'],['exp','Espansioni'],['scan','Scanner'],['col','Collezioni'],['menu','Menu']].map(([k,t])=>`<button data-a="tab" data-id="${k}" class="${tab==k?'on':''}">${t}</button>`).join('')}
+const sheet=h=>{$('#sh').innerHTML=`<div>${h}</div>`;$('#sh').style.display='flex'};
+const close=()=>{$('#sh').style.display='none'};
+function form(c,it){const vs=c.vs&&c.vs.length?c.vs:['normal'];
+ return`<div class="row" style="align-items:flex-start"><img src="${E(c.img)}" width="110" style="border-radius:8px"><div style="flex:1"><h2 style="margin-top:0">${E(c.n)}</h2><div class="mu">${E(c.s)} · ${E(c.num)}</div><div class="big" style="font-size:26px">${eur(c.p)}</div></div></div>
+ <label>Collezione</label><select id="f-col">${opt(S.cols.map(x=>[x.id,x.n]),it?it.col:S.cur)}</select>
+ <label>Lingua</label><select id="f-lg">${opt(LANG,it?it.lg:'IT')}</select>
+ <label>Condizione</label><select id="f-cd">${opt(COND.map(x=>[x[0],x[0]+' – '+x[1]]),it?it.cd:'NM')}</select>
+ <label>Variante</label><select id="f-vr">${opt(vs.map(v=>[v,VL[v]||v]),it?it.vr:vs[0])}</select>
+ <label>Quantità</label><input id="f-q" type="number" min="1" value="${it?it.q:1}" inputmode="numeric">
+ <label>Prezzo d’acquisto (€, facoltativo)</label><input id="f-b" type="number" step="0.01" value="${it&&it.b!=null?it.b:''}" inputmode="decimal"><br>`}
+const rd=()=>({col:$('#f-col').value,lg:$('#f-lg').value,cd:$('#f-cd').value,vr:$('#f-vr').value,q:Math.max(1,parseInt($('#f-q').value)||1),b:$('#f-b').value===''?null:parseFloat($('#f-b').value)});
+let cur=null;
+const A={
+ tab(d){tab=d.id;sub=null;msg='';render()},back(){sub=null;msg='';render()},close,
+ add(d){cur=R[d.i];sheet(form(cur)+`<button class="pri" data-a="doadd">Aggiungi alla collezione</button><br><br><button data-a="dowish" style="width:100%">♥ Aggiungi alla wishlist</button><br><br><button data-a="close" style="width:100%">Annulla</button>`)},
+ doadd(){const f=rd(),c=cur;const k=S.items.find(i=>i.id==c.id&&i.col==f.col&&i.lg==f.lg&&i.cd==f.cd&&i.vr==f.vr);
+  if(k){k.q+=f.q;if(f.b!=null)k.b=f.b}else S.items.push({id:c.id,n:c.n,s:c.s,sid:c.sid,ser:c.ser,num:c.num,img:c.img,p:c.p,cm:c.cm,...f});
+  save();close();render()},
+ dowish(){if(!S.wish.some(w=>w.id==cur.id))S.wish.push(cur);save();close()},
+ wadd(d){R=S.wish;A.add(d)},
+ edit(d){const i=S.items[d.i];cur=i;cur.idx=+d.i;const m=i.cm;
+  sheet(form(i,i)+`<button class="pri" data-a="doedit">Salva modifiche</button><br><br><button data-a="dodel" style="width:100%;color:var(--ko)">Elimina carta</button><h2>Andamento prezzo (Cardmarket)</h2>`+(m?`<div class="card">Media 1 giorno: ${eur(m.a1)}<br>Media 7 giorni: ${eur(m.a7)}<br>Media 30 giorni: ${eur(m.a30)}<br>Prezzo di tendenza: ${eur(m.t)}</div>`:'<p class="mu">Prezzi non disponibili per questa carta.</p>'))},
+ doedit(){Object.assign(S.items[cur.idx],rd());save();close();render()},
+ dodel(){if(confirm('Eliminare questa carta dalla collezione?')){S.items.splice(cur.idx,1);save();close();render()}},
+ async set(d){sub={t:'set',n:(SETS.find(s=>s.id==d.id)||{}).name};msg='Carico le carte…';R=[];render();
+  try{R=(await api(`cards?pageSize=250&orderBy=number&${SEL}&q=`+encodeURIComponent('set.id:'+d.id))).map(mk);msg=''}catch(e){msg='Caricamento non riuscito ('+e.message+')'}render()},
+ cs(d){sub={t:'cs',id:d.id,o:'p'};render()},wl(){sub={t:'wl'};render()},
+ newcol(){const n=prompt('Nome della nuova collezione');if(n&&n.trim()){const id='c'+Date.now();S.cols.push({id,n:n.trim()});S.cur=id;save();render()}},
+ settings(){sheet(`<h2>Impostazioni</h2><label>Il tuo nome</label><input id="s-n" value="${E(S.name)}"><label>Tema</label><select id="s-t">${opt([['dark','Scuro'],['light','Chiaro']],S.theme)}</select><label>Chiave API Pokémon TCG (facoltativa, rende la ricerca più veloce)</label><input id="s-k" value="${E(S.key)}"><br><button class="pri" data-a="sets">Salva</button>`)},
+ sets(){S.name=$('#s-n').value.trim();S.theme=$('#s-t').value;S.key=$('#s-k').value.trim();document.documentElement.dataset.t=S.theme;save();close();render()},
+ exp(){const h=['collezione','id','nome','set','setId','serie','numero','immagine','prezzo','lingua','condizione','variante','quantita','prezzo_acquisto'];
+  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const cn=id=>(S.cols.find(c=>c.id==id)||{}).n;
+  const t=[h.join(',')].concat(S.items.map(i=>[cn(i.col),i.id,i.n,i.s,i.sid,i.ser,i.num,i.img,i.p,i.lg,i.cd,i.vr,i.q,i.b].map(q).join(','))).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+t],{type:'text/csv'}));a.download='collezione-pokemon.csv';a.click()},
+ imp(){$('#fi').click()}
+};
+document.addEventListener('click',e=>{const a=e.target.closest('[data-a]');if(a&&A[a.dataset.a])A[a.dataset.a](a.dataset)});
+document.addEventListener('change',e=>{const c=e.target.dataset.ch;if(c=='cur'){S.cur=e.target.value;save();render()}if(c=='ord'){sub.o=e.target.value;render()}});
+function csv(t){const r=[];let row=[],f='',q=false;t=t.replace(/^\ufeff/,'');for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==','){row.push(f);f=''}else if(c=='\n'||c=='\r'){if(c=='\r'&&t[i+1]=='\n')i++;row.push(f);f='';r.push(row);row=[]}else f+=c}if(f||row.length){row.push(f);r.push(row)}return r.filter(x=>x.length>1)}
+$('#fi').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;const r=csv(await f.text());r.shift();let n=0;
+ r.forEach(x=>{if(x.length<13)return;let c=S.cols.find(k=>k.n==x[0]);if(!c){c={id:'c'+Date.now()+n,n:x[0]||'Importata'};S.cols.push(c)}
+  S.items.push({col:c.id,id:x[1],n:x[2],s:x[3],sid:x[4],ser:x[5],num:x[6],img:x[7],p:parseFloat(x[8])||0,cm:null,lg:x[9],cd:x[10],vr:x[11],q:parseInt(x[12])||1,b:x[13]===''||x[13]==null?null:parseFloat(x[13])});n++});
+ save();alert(n+' carte importate');e.target.value='';render();refresh()});
+function snap(){const d=new Date().toISOString().slice(0,10),v={};S.cols.forEach(c=>v[c.id]=val(S.items.filter(i=>i.col==c.id)));
+ const l=S.hist[S.hist.length-1];if(l&&l[0]==d)l[1]=v;else S.hist.push([d,v]);S.hist=S.hist.slice(-120);save()}
+async function refresh(){const ids=[...new Set(S.items.map(i=>i.id))];
+ try{for(let k=0;k<ids.length;k+=20){const q=ids.slice(k,k+20).map(x=>'id:'+x).join(' OR ');
+  (await api('cards?pageSize=250&select=id,tcgplayer,cardmarket&q='+encodeURIComponent(q))).forEach(c=>S.items.filter(i=>i.id==c.id).forEach(i=>{const p=pr(c);if(p)i.p=p;i.cm=cmx(c)||i.cm}))}}catch(e){}
+ snap();render()}
+render();snap();if(S.items.length)refresh();
+</script></body></html>
