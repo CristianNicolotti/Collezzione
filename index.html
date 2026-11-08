@@ -78,7 +78,7 @@ const exp=()=>{const tabs='';
  loadSets();loadDex(EL);const D=DEX[EL];
  if(!D)return'<h1>Espansioni</h1>'+tabs+'<p class="mu">Carico le espansioni…</p>'+(msg?`<p class="dn">${E(msg)}</p>`:'');
  const ow={};colItems().forEach(i=>(ow[i.sid]=ow[i.sid]||new Set()).add(i.id));
- return'<h1>Espansioni</h1>'+tabs+[...D].reverse().map(sr=>{const ss=[...sr.sets].reverse();return`<details><summary><div class="card row"><div style="display:flex;gap:12px;align-items:center">${dl(sr.logo||(ss.find(x=>x.logo)||{}).logo,'84px','36px')}<b style="font-size:18px">${E(sr.n)}</b></div><span class="mu">${ss.length} ›</span></div></summary><div class="g2">${ss.map(s=>{const o=s.pt&&ow[s.pt]?ow[s.pt].size:0;return`<div class="tile" data-a="dset" data-l="${EL}" data-id="${E(s.id)}" data-pt="${E(s.pt||'')}"><div class="lg">${dl(s.logo,'100%','110px',s.pt)}</div><b>${E(s.n)}</b><div class="bar"><i style="width:${Math.min(100,o/(s.tot||1)*100)}%"></i></div><div class="mu">${EL=='it'?o+'/'+s.tot:s.tot+' carte'}</div></div>`}).join('')}</div></details>`}).join('')};
+ return'<h1>Espansioni</h1>'+tabs+[...D].reverse().map(sr=>{const ss=[...sr.sets].reverse();return`<details data-sr="${E(sr.id)}"${OS==sr.id?' open':''}><summary><div class="card row"><div style="display:flex;gap:12px;align-items:center">${dl(sr.logo||(ss.find(x=>x.logo)||{}).logo,'84px','36px')}<b style="font-size:18px">${E(sr.n)}</b></div><span class="mu">${ss.length} ›</span></div></summary><div class="g2">${ss.map(s=>{const o=s.pt&&ow[s.pt]?ow[s.pt].size:0;return`<div class="tile" data-a="dset" data-l="${EL}" data-id="${E(s.id)}" data-pt="${E(s.pt||'')}"><div class="lg">${dl(s.logo,'100%','110px',s.n)}</div><b>${E(s.n)}</b><div class="bar"><i style="width:${Math.min(100,o/(s.tot||1)*100)}%"></i></div><div class="mu">${EL=='it'?o+'/'+s.tot:s.tot+' carte'}</div></div>`}).join('')}</div></details>`}).join('')};
 const col=()=>{loadSets();loadDex('it');const a=colItems(),g={};a.forEach(i=>(g[i.sid]=g[i.sid]||{n:i.s,l:[]}).l.push(i));
  return`<h1>Collezioni</h1>${colSel()}<div class="card"><div class="mu">Valore</div><div class="big">${eur(val(a))}</div>${chart()}</div><h2>Per espansione</h2>`+(a.length?Object.keys(g).sort((x,y)=>dt(y,g).localeCompare(dt(x,g))).map(k=>`<div class="card row" data-a="cs" data-id="${E(k)}"><div style="display:flex;gap:12px;align-items:center">${lgo(k,'72px','40px')}<div><b>${E(sn(k,g[k].n))}</b><div class="mu">${g[k].l.reduce((t,i)=>t+i.q,0)} carte · ${[...new Set(g[k].l.map(i=>i.lg))].map(x=>FL[x]||x).join(' ')}</div></div></div><b>${eur(val(g[k].l))} ›</b></div>`).join(''):'<p class="mu">Ancora nessuna carta. Cercane una e aggiungila.</p>')};
 const menu=()=>`<h1>Menu</h1><div class="card"><button class="pri" data-a="settings">Impostazioni</button></div><div class="card"><button class="pri" data-a="wl">Wishlist (${S.wish.length})</button></div><div class="card"><button class="pri" data-a="imp">Importa CSV</button></div><div class="card"><button class="pri" data-a="exp">Esporta CSV</button></div>`;
@@ -94,7 +94,7 @@ function render(){$('#m').innerHTML=sub?subView():({home,exp,scan,col,menu}[tab]
 const sheet=h=>{$('#sh').innerHTML=`<div>${h}</div>`;$('#sh').style.display='flex'};
 const close=()=>{$('#sh').style.display='none'};
 function form(c,it){const vs=c.vs&&c.vs.length?c.vs:['normal'];
- return`<div class="row" style="align-items:flex-start"><img src="${E(c.img)}" width="110" style="border-radius:8px" data-a="zoom" data-src="${E(c.img)}"><div style="flex:1"><h2 style="margin-top:0">${E(c.n)}</h2><div class="mu">${E(c.s)} · ${E(c.num)}</div><div class="big" style="font-size:26px">${eur(c.p)}</div><div class="mu">Tocca la carta per ingrandirla</div></div></div>
+ return`<div style="margin-bottom:12px"><button data-a="close">← Indietro</button></div><div class="row" style="align-items:flex-start"><img src="${E(c.img)}" width="110" style="border-radius:8px" data-a="zoom" data-src="${E(c.img)}"><div style="flex:1"><h2 style="margin-top:0">${E(c.n)}</h2><div class="mu">${E(c.s)} · ${E(c.num)}</div><div class="big" style="font-size:26px">${eur(c.p)}</div><div class="mu">Tocca la carta per ingrandirla</div></div></div>
  <label>Collezione</label><select id="f-col">${opt(S.cols.map(x=>[x.id,x.n]),it?it.col:S.cur)}</select>
  <label>Lingua</label><select id="f-lg">${opt(LANG,it?it.lg:'IT')}</select>
  <label>Condizione</label><select id="f-cd">${opt(COND.map(x=>[x[0],x[0]+' – '+x[1]]),it?it.cd:(S.lc||'NM'))}</select>
@@ -104,7 +104,7 @@ function form(c,it){const vs=c.vs&&c.vs.length?c.vs:['normal'];
 const rd=()=>({col:$('#f-col').value,lg:$('#f-lg').value,cd:$('#f-cd').value,vr:$('#f-vr').value,q:Math.max(1,parseInt($('#f-q').value)||1),b:$('#f-b').value===''?null:parseFloat($('#f-b').value)});
 let cur=null;
 const A={
- tab(d){tab=d.id;sub=null;msg='';$('#q').value='';render()},back(){sub=null;msg='';$('#q').value='';render()},close,
+ tab(d){tab=d.id;sub=null;msg='';$('#q').value='';render()},back(){sub=null;msg='';$('#q').value='';render();if(tab=='exp'||tab=='col')window.scrollTo(0,SY)},close,
  retry(){sub&&sub.t=='set'?A.set({id:sub.id}):doSearch(LQ)},
  add(d){cur=R[d.i];sheet(form(cur)+`<button class="pri" data-a="doadd">Aggiungi alla collezione</button><br><br><button data-a="dowish" style="width:100%">♥ Aggiungi alla wishlist</button><br><br><button data-a="close" style="width:100%">Annulla</button><h2>Andamento prezzo</h2>`+pchart(cur.cm,cur.p))},
  doadd(){const f=rd(),c=cur;const k=S.items.find(i=>i.id==c.id&&i.col==f.col&&i.lg==f.lg&&i.cd==f.cd&&i.vr==f.vr);
@@ -118,9 +118,9 @@ const A={
  dodel(){if(confirm('Eliminare questa carta dalla collezione?')){S.items.splice(cur.idx,1);save();close();render()}},
  async set(d){sub={t:'set',id:d.id,o:'num',f:'all',q:'',n:(LG[d.id]&&LG[d.id].n)||(SETS.find(s=>s.id==d.id)||{}).name};msg='Carico le carte…';R=[];render();
   try{let r=await api(`cards?pageSize=250&${SEL}&q=`+encodeURIComponent('set.id:'+d.id));if(r.length>=250)r=r.concat(await api(`cards?pageSize=250&page=2&${SEL}&q=`+encodeURIComponent('set.id:'+d.id)));R=r.map(mk);sortR(R,'num');msg=''}catch(e){msg='Caricamento non riuscito ('+e.message+')';sub.err=1}render()},
- cs(d){sub={t:'cs',id:d.id,o:'p'};render()},wl(){sub={t:'wl'};render()},
+ cs(d){SY=window.scrollY;sub={t:'cs',id:d.id,o:'p'};render()},wl(){sub={t:'wl'};render()},
  newcol(){const n=prompt('Nome della nuova collezione');if(n&&n.trim()){const id='c'+Date.now();S.cols.push({id,n:n.trim()});S.cur=id;save();render()}},
- settings(){sheet(`<h2>Impostazioni</h2><label>Il tuo nome</label><input id="s-n" value="${E(S.name)}"><label>Tema</label><select id="s-t">${opt([['dark','Scuro'],['light','Chiaro']],S.theme)}</select><label>Chiave API Pokémon TCG (facoltativa, rende la ricerca più veloce)</label><input id="s-k" value="${E(S.key)}"><br><button class="pri" data-a="sets">Salva</button>`)},
+ settings(){sheet(`<div style="margin-bottom:12px"><button data-a="close">← Indietro</button></div><h2>Impostazioni</h2><label>Il tuo nome</label><input id="s-n" value="${E(S.name)}"><label>Tema</label><select id="s-t">${opt([['dark','Scuro'],['light','Chiaro']],S.theme)}</select><label>Chiave API Pokémon TCG (facoltativa, rende la ricerca più veloce)</label><input id="s-k" value="${E(S.key)}"><br><button class="pri" data-a="sets">Salva</button>`)},
  sets(){S.name=$('#s-n').value.trim();S.theme=$('#s-t').value;S.key=$('#s-k').value.trim();document.documentElement.dataset.t=S.theme;save();close();render()},
  exp(){const h=['collezione','id','nome','set','setId','serie','numero','immagine','prezzo','lingua','condizione','variante','quantita','prezzo_acquisto'];
   const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const cn=id=>(S.cols.find(c=>c.id==id)||{}).n;
@@ -130,13 +130,13 @@ const A={
  snap(){const v=$('#cv');if(!v||!v.videoWidth||BZ)return;const g=grab(v.videoWidth,v.videoHeight),c=document.createElement('canvas');c.width=g.w;c.height=g.h;c.getContext('2d').drawImage(v,g.x,g.y,g.w,g.h,0,0,g.w,g.h);runScan(c)},
  photo(){$('#ph').click()},
  chip(d){sub.f=d.f;render()},
- dset(d){if(d.pt)A.set({id:d.pt});else alert('Le carte di questa espansione non sono ancora collegate. Usa la ricerca per nome.')},
+ dset(d){SY=window.scrollY;if(d.pt)A.set({id:d.pt});else alert('Le carte di questa espansione non sono ancora collegate. Usa la ricerca per nome.')},
  zoom(d){const f=$('#fs'),im=new Image();f.innerHTML='';im.onerror=()=>{im.onerror=null;im.src=d.src};im.src=d.src.replace(/\.png$/,'_hires.png');im.style.cssText='max-width:96vw;max-height:92vh;border-radius:12px';f.appendChild(im);f.style.display='flex'},
  fsx(){$('#fs').style.display='none'},
  manual(){sub=null;tab='home';render();const q=$('#q');q.value=LNM;q.focus()}
 };
 document.addEventListener('click',e=>{const a=e.target.closest('[data-a]');if(a&&A[a.dataset.a])A[a.dataset.a](a.dataset)});
-document.addEventListener('change',e=>{const c=e.target.dataset.ch;if(c=='cur'){S.cur=e.target.value;save();render()}if(c=='ord'){sub.o=e.target.value;render()}if(c=='sort'){sub.o=e.target.value;sortR(R,sub.o);render()}});
+document.addEventListener('change',e=>{const c=e.target.dataset.ch;if(c=='cur'){S.cur=e.target.value;save();render()}if(c=='ord'){sub.o=e.target.value;render()}if(c=='sort'){sub.o=e.target.value;sortR(R,sub.o);render()}if(c=='fil'){sub.f=e.target.value;render()}});
 function csv(t){const r=[];let row=[],f='',q=false;t=t.replace(/^\ufeff/,'');for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==','){row.push(f);f=''}else if(c=='\n'||c=='\r'){if(c=='\r'&&t[i+1]=='\n')i++;row.push(f);f='';r.push(row);row=[]}else f+=c}if(f||row.length){row.push(f);r.push(row)}return r.filter(x=>x.length>1)}
 $('#fi').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;const r=csv(await f.text());r.shift();let n=0;
  r.forEach(x=>{if(x.length<13)return;let c=S.cols.find(k=>k.n==x[0]);if(!c){c={id:'c'+Date.now()+n,n:x[0]||'Importata'};S.cols.push(c)}
@@ -187,22 +187,23 @@ const sgHtml=()=>{const f=sub.f||'all',q=nz(sub.q),L=R.map((c,i)=>[c,i]).filter(
 function setView(){const nb=R.filter(isBase).length,tot=R.length,f=sub.f||'all',ow=R.filter(c=>owned(c.id)).length,tv=R.reduce((t,c)=>t+c.p,0),miss=R.filter(c=>!owned(c.id)).reduce((t,c)=>t+c.p,0),top=[...R].sort((a,b)=>b.p-a.p).slice(0,3);
  const chip=(k,t,n)=>`<button data-a="chip" data-f="${k}" style="white-space:nowrap;${f==k?'background:var(--ac);color:#fff':''}">${t} ${n}</button>`;
  const collage=top.length?`<div style="position:relative;width:165px;height:125px;flex:none">${top.map((c,i)=>`<img src="${E(c.img)}" alt="" style="position:absolute;height:105px;border-radius:6px;top:${i==1?0:10}px;left:${[0,42,84][i]}px;transform:rotate(${[-9,0,9][i]}deg);z-index:${i==1?2:1};box-shadow:0 2px 8px #0008">`).join('')}</div>`:'';
- return`<div class="row">${back}</div><h1>${E(sub.n)}</h1>`+(msg?`<p class="mu">${E(msg)}</p>`:'')+rt()+(R.length?`<div class="card"><div class="row" style="align-items:flex-start"><div><div class="mu">VALORE SET</div><div style="font-size:34px;font-weight:800;line-height:1.1">${eur(tv)}</div></div>${collage}</div><div class="row" style="margin-top:6px">${lgo(sub.id,'56px','44px')}<div style="flex:1"><div class="row"><span class="mu">${ow} di ${tot} carte</span><span class="mu">Ti mancano <b style="color:var(--tx)">${eur(miss)}</b></span></div><div class="bar"><i style="width:${Math.min(100,ow/tot*100)}%"></i></div></div></div></div><input id="sq" placeholder="Cerca nell’espansione…" value="${E(sub.q||'')}" style="margin-bottom:10px"><div class="row" style="margin-bottom:10px"><div style="display:flex;gap:6px;overflow-x:auto;flex:1">${chip('all','Tutte',tot)}${chip('base','Set base',nb)}${chip('ex','Fuoriserie',tot-nb)}</div><select data-ch="sort" style="width:auto;flex:none">${opt([['num','Numero'],['n','Nome'],['p','Prezzo ↓'],['pl','Prezzo ↑']],sub.o)}</select></div><div id="sg">${sgHtml()}</div>`:'')}
+ return`<div class="row">${back}</div><h1>${E(sub.n)}</h1>`+(msg?`<p class="mu">${E(msg)}</p>`:'')+rt()+(R.length?`<div class="card"><div class="row" style="align-items:flex-start"><div><div class="mu">VALORE SET</div><div style="font-size:34px;font-weight:800;line-height:1.1">${eur(tv)}</div></div>${collage}</div><div class="row" style="margin-top:6px">${lgo(sub.id,'56px','44px')}<div style="flex:1"><div class="row"><span class="mu">${ow} di ${tot} carte</span><span class="mu">Ti mancano <b style="color:var(--tx)">${eur(miss)}</b></span></div><div class="bar"><i style="width:${Math.min(100,ow/tot*100)}%"></i></div></div></div></div><input id="sq" placeholder="Cerca nell’espansione…" value="${E(sub.q||'')}" style="margin-bottom:10px"><div class="row" style="margin-bottom:10px"><select data-ch="fil" style="flex:1">${opt([['all','Tutte ('+tot+')'],['base','Set base ('+nb+')'],['ex','Fuoriserie ('+(tot-nb)+')']],f)}</select><select data-ch="sort" style="width:auto;flex:none">${opt([['num','Numero'],['n','Nome'],['p','Prezzo ↓'],['pl','Prezzo ↑']],sub.o)}</select></div><div id="sg">${sgHtml()}</div>`:'')}
 document.addEventListener('input',e=>{if(e.target.id=='sq'&&sub){sub.q=e.target.value;$('#sg').innerHTML=sgHtml()}});
 let SL=0,SF=0,EL='it',DEX={},DL={},DF={},LG={};
+let OS='',SY=0;
+document.addEventListener('toggle',e=>{const t=e.target;if(t.dataset&&t.dataset.sr){if(t.open)OS=t.dataset.sr;else if(OS==t.dataset.sr)OS=''}},true);
 const nz=x=>String(x||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 const sn=(id,fb)=>(LG[id]&&LG[id].n)||fb;
-const lgo=(id,w,h)=>{const g=LG[id];return g&&g.l?dl(g.l,w,h):`<img loading="lazy" src="https://images.pokemontcg.io/${E(id)}/logo.png" style="width:${w};height:${h};object-fit:contain" alt="" onerror="this.style.visibility='hidden'">`};
-const dl=(u,w,h,pt)=>{const st=`style="width:${w};height:${h};object-fit:contain"`;if(!u)return pt?`<img loading="lazy" src="https://images.pokemontcg.io/${E(pt)}/logo.png" ${st} alt="" onerror="this.style.visibility='hidden'">`:'';
- return`<img loading="lazy" src="${E(u)}.png" ${st} data-pt="${E(pt||'')}" alt="" onerror="const t=this;if(!t.dataset.f&&t.src.includes('/it/')){t.dataset.f=1;t.src=t.src.replace('/it/','/en/')}else if(t.dataset.pt&&!t.dataset.g){t.dataset.g=1;t.src='https://images.pokemontcg.io/'+t.dataset.pt+'/logo.png'}else t.style.visibility='hidden'">`};
+const lgo=(id,w,h)=>{const g=LG[id];return g&&g.l?dl(g.l,w,h):''};
+const dl=(u,w,h,a)=>u?`<img loading="lazy" src="${E(u)}.png" alt="${E(a||'')}" style="width:${w};height:${h};object-fit:contain" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'mu',textContent:this.alt}))">`:(a?`<span class="mu">${E(a)}</span>`:'');
 async function tg(p,l){const r=await fetch('https://api.tcgdex.net/v2/'+l+'/'+p);if(!r.ok)throw new Error('Errore '+r.status);return r.json()}
 function mapSets(){if(!SETS||!DEX.it)return;const bn={},bi={};SETS.forEach(x=>{bn[nz(x.name)]=x;bi[nz(x.id)]=x});
  DEX.it.forEach(sr=>sr.sets.forEach(x=>{const p=bn[nz(x.en)]||bi[nz(x.id.replace(/(\D)0+(\d)/g,'$1$2').replace('.','pt'))];if(p){x.pt=p.id;LG[p.id]={l:x.logo,n:x.n}}}))}
-async function loadDex(l){if(DEX[l]||DL[l]||Date.now()-(DF[l]||0)<20000)return;const ck='ptkd2_'+l;
+async function loadDex(l){if(DEX[l]||DL[l]||Date.now()-(DF[l]||0)<20000)return;const ck='ptkd3_'+l;
  try{const c=JSON.parse(L[ck]||'null');if(c&&Date.now()-c.t<6048e5){DEX[l]=c.d;mapSets();return}}catch(e){}
  DL[l]=1;try{const ser=await tg('series',l),full=await Promise.all(ser.map(x=>tg('series/'+x.id,l).catch(()=>null)));let en={};
   if(l=='it')(await tg('sets','en')).forEach(x=>en[x.id]=x.name);
-  DEX[l]=full.filter(x=>x&&x.id!='tcgp').map(x=>({id:x.id,n:x.name,logo:x.logo||'',sets:(x.sets||[]).map(y=>({id:y.id,n:y.name,logo:y.logo||`https://assets.tcgdex.net/en/${x.id}/${y.id}/logo`,en:en[y.id]||y.name,tot:y.cardCount?y.cardCount.total:0}))}));
+  DEX[l]=full.filter(x=>x&&x.id!='tcgp').map(x=>({id:x.id,n:x.name,logo:(x.logo&&x.logo.includes('/it/'))?x.logo:'',sets:(x.sets||[]).map(y=>({id:y.id,n:y.name,logo:(y.logo&&y.logo.includes('/it/'))?y.logo:'',en:en[y.id]||y.name,tot:y.cardCount?y.cardCount.total:0}))}));
   try{L[ck]=JSON.stringify({t:Date.now(),d:DEX[l]})}catch(e){}}catch(e){DF[l]=Date.now();msg='Impossibile caricare le espansioni ('+e.message+')'}DL[l]=0;mapSets();render()}
 const FL={IT:'🇮🇹',EN:'🇬🇧',JA:'🇯🇵',DE:'🇩🇪',FR:'🇫🇷',ES:'🇪🇸',PT:'🇵🇹',KO:'🇰🇷',ZH:'🇨🇳'};
 function csView(){loadDex('it');const a=colItems().filter(i=>i.sid==sub.id).sort((x,y)=>sub.o=='n'?x.n.localeCompare(y.n):y.p-x.p),own=new Set(a.map(i=>i.id)).size,st=SETS&&SETS.find(s=>s.id==sub.id),T=st?st.total:0;if(!SETS)loadSets();
